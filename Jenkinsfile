@@ -1,29 +1,62 @@
-@Library('Shared')_
+@Library("sharedLib") _
 pipeline{
-    agent { label 'dev-server'}
+    agent {label "ultimate"}
     
     stages{
-        stage("Code clone"){
+        stage("Shared Lib Runs"){
             steps{
+                script{
+                    pipeline_script()
+                }
+            }
+        }
+        stage("Clean Workspace"){
+            steps{
+                cleanWs()
+                 sh '''
+                        mkdir -p ./data/mysql/db
+                        chmod 777 ./data/mysql/db
+                    '''
+            }
+        }
+        stage("Code"){
+            steps{
+                script{
+                    gitCloner("https://github.com/brijesh025/devops-notes-app.git", "main")
+                }
+            }
+        }
+        stage("Build"){
+            steps{
+                echo "This is building the code"
                 sh "whoami"
-            clone("https://github.com/LondheShubham153/django-notes-app.git","main")
+                script{
+                    docker_build("notes-app", "latest", "${dockerHubUsername}")
+                }
             }
         }
-        stage("Code Build"){
+        stage("Test"){
             steps{
-            dockerbuild("notes-app","latest")
+                echo "This is testing the code"
             }
         }
-        stage("Push to DockerHub"){
+        stage("Push to docker hub"){
             steps{
-                dockerpush("dockerHubCreds","notes-app","latest")
+                echo "This is pussying to docker hub"
+                withCredentials([usernamePassword('credentialsId': "dockerHubPass" ,
+                    passwordVariable: "dockerHubPassword", 
+                    usernameVariable: "dockerHubUsername")]){
+                        sh "docker login -u ${env.dockerHubUsername} -p ${env.dockerHubPassword}"
+                        sh "docker image tag notes-app:latest ${env.dockerHubUsername}/notes-app:latest"
+                        sh "docker push ${env.dockerHubUsername}/notes-app:latest"
+                    }
             }
         }
-        stage("Deploy"){
+        stage("Deploying"){
             steps{
-                deploy()
+                echo "This is deployment process going on and created a ultimate jenkins_learner folder"
+                sh 'docker compose up -d'
+                }
             }
         }
-        
     }
-}
